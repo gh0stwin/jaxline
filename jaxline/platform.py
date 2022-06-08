@@ -15,8 +15,7 @@
 """A Deepmind-specific platform for running Experiments with Jaxline."""
 
 from concurrent import futures
-import os
-from typing import Any, Mapping
+from typing import Any
 
 from absl import flags
 from absl import logging
@@ -29,9 +28,6 @@ from jaxline import train
 from jaxline import utils
 from ml_collections import config_dict
 from ml_collections import config_flags
-import numpy as np
-
-import tensorflow as tf
 
 
 # TODO(tomhennigan) Add support for ipdb and pudb.
@@ -68,37 +64,13 @@ def create_checkpointer(
   return utils.InMemoryCheckpointer(config, mode)
 
 
-class TensorBoardLogger:
-  """Writer to write experiment data to stdout."""
-
-  def __init__(self, config, mode: str):
-    """Initializes the writer."""
-    log_dir = os.path.join(config.checkpoint_dir, mode)
-    self._writer = tf.summary.create_file_writer(log_dir)
-
-  def write_scalars(self, global_step: int, scalars: Mapping[str, Any]):
-    """Writes scalars to stdout."""
-    global_step = int(global_step)
-    with self._writer.as_default():
-      for k, v in scalars.items():
-        tf.summary.scalar(k, v, step=global_step)
-    self._writer.flush()
-
-  def write_images(self, global_step: int, images: Mapping[str, np.ndarray]):
-    """Writes images to writers that support it."""
-    global_step = int(global_step)
-    with self._writer.as_default():
-      for k, v in images.items():
-        # Tensorboard only accepts [B, H, W, C] but we support [H, W] also.
-        if v.ndim == 2:
-          v = v[None, ..., None]
-        tf.summary.image(k, v, step=global_step)
-    self._writer.flush()
-
 
 def create_writer(config: config_dict.ConfigDict, mode: str) -> Any:
   """Creates an object to be used as a writer."""
-  return TensorBoardLogger(config, mode)
+  if config.logger.name == "neptune_ai":
+    return utils.NeptuneAiLogger(config, mode)
+
+  return utils.TensorBoardLogger(config, mode)
 
 
 @utils.debugger_fallback

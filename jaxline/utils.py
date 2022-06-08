@@ -14,12 +14,14 @@
 # ==============================================================================
 """Utility functions for Jaxline experiments."""
 
+import abc
 import collections
 from concurrent import futures
 import contextlib
 import copy
 import enum
 import functools
+import os
 import pdb
 import queue
 import sys
@@ -34,6 +36,10 @@ import chex
 import jax
 import jax.numpy as jnp
 from ml_collections import config_dict
+import neptune.new as neptune
+from neptune.new.types import File
+import numpy as np
+import tensorflow as tf
 from typing_extensions import Protocol
 import wrapt
 
@@ -65,12 +71,27 @@ T = TypeVar("T")
 F = TypeVar("F", bound=Callable)
 
 
-class Writer(Protocol):
-  """Interface for writers/loggers."""
+class Writer(abc.ABC):
+  """Logger interface."""
+  def __init__(self, config, mode: str):
+    self._config = config
+    self._mode = mode
 
+  @abc.abstractmethod
   def write_scalars(self, global_step: int, scalars: Mapping[str, Any]):
-    """Writes a dictionary of scalars."""
+    """Write scalars to logger."""
 
+  @abc.abstractmethod
+  def write_images(self, global_step: int, images: Mapping[str, Any]):
+    """Write images to logger."""
+
+  def _post_init(self):
+    """Log initial items after logger initialization."""
+    self._write_config()
+
+  def _write_config():
+    """Write config to logger. By default ignore it."""
+    return
 
 class Checkpointer(Protocol):
   """An interface for checkpointer objects."""
@@ -619,3 +640,76 @@ def disable_pmap_jit(fn: F) -> F:
     else:
       return fn(*args, **kwargs)
   return inner_wrapper
+
+
+class NeptuneAiLogger(Writer):
+  """Neptune AI logger."""
+
+  def __init__(self, config, mode):
+    super().__init__(config, mode)
+    tags = self._config.get("logger.tags", [])
+    source_files = self._config.get("logger.source_files", None)
+    capture_stdout = self._config.get("logger.capture_stdout", False)
+    capture_stderr = self._config.get("logger.capture_stderr", False)
+    hardware_metrics = self._config.get("logger.capture_hardware_mertics", False)
+    self._writer = neptune.init(project=self._config.logger.project,
+                                name=self._config.logger.name,
+                                api_token=self._config.logger.api_token,
+                                tags=tags, source_files=source_files,
+                                capture_hardware_metrics=hardware_metrics,
+                                capture_stdout=capture_stdout,
+                                capture_stderr=capture_stderr)
+
+    self._post_init()
+
+  def write_scalars(self, global_step: int, scalars: Mapping[str, Any]):
+    global_step = int(global_step)
+    self._writer[self._artifact_tag("global_step")].log(global_step)
+    for k, v in scalars.items():
+      self._writer[self._artifact_tag(k)].log(v, step=global_step)
+
+  def write_images(self, global_step: int, images: Mapping[str, Any]):
+    global_step = int(global_step)
+    for k, v in images.items():
+      if v.ndim == 2:
+        v = v[None, ..., None]
+        self._writer[self._artifact_tag(k)].log(File.as_image(v), step=global_step)
+      elif v.ndim == 4:
+        for i in range(v.shape[0]):
+          self._writer[self._artifact_tag("{}_{}".format(k, i))].log(v[i],
+                                                                     step=global_step)
+
+  def _artifact_tag(self, scalar_key):
+    return "{}/{}".format(self._mode, scalar_key)
+
+  def _write_config():
+    self._writer['config'] = dict(self._config)
+
+class TensorBoardLogger(Writer):
+  """Writer to write experiment data to stdout."""
+
+  def __init__(self, config, mode: str):
+    """Initializes the writer."""
+    super().__init__(config, mode)
+    log_dir = os.path.join(config.checkpoint_dir, mode)
+    self._writer = tf.summary.create_file_writer(log_dir)
+    self._post_init()
+
+  def write_scalars(self, global_step: int, scalars: Mapping[str, Any]):
+    """Writes scalars to stdout."""
+    global_step = int(global_step)
+    with self._writer.as_default():
+      for k, v in scalars.items():
+        tf.summary.scalar(k, v, step=global_step)
+    self._writer.flush()
+
+  def write_images(self, global_step: int, images: Mapping[str, np.ndarray]):
+    """Writes images to writers that support it."""
+    global_step = int(global_step)
+    with self._writer.as_default():
+      for k, v in images.items():
+        # Tensorboard only accepts [B, H, W, C] but we support [H, W] also.
+        if v.ndim == 2:
+          v = v[None, ..., None]
+        tf.summary.image(k, v, step=global_step)
+    self._writer.flush()
