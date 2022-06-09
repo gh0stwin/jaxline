@@ -691,6 +691,9 @@ class NeptuneAiLogger(Writer):
       logging.get_absl_logger().addHandler(NeptuneHandler(run=self._writer))
 
   def _write_config(self):
+    if self._config.logger.kwargs.get('log_config', True) is False:
+      return
+
     self._writer['config'] = dict(self._config)
 
 class TensorBoardLogger(Writer):
