@@ -37,6 +37,7 @@ import jax
 import jax.numpy as jnp
 from ml_collections import config_dict
 import neptune.new as neptune
+from neptune.new.integrations.python_logger import NeptuneHandler
 from neptune.new.types import File
 import numpy as np
 import tensorflow as tf
@@ -681,6 +682,12 @@ class NeptuneAiLogger(Writer):
 
   def _artifact_tag(self, scalar_key):
     return "{}/{}".format(self._mode, scalar_key)
+
+  def _post_init(self):
+    super()._post_init()
+
+    if self._config.get("logger.kwargs.capture_stdout", False) is True:
+      logging.get_absl_logger().addHandler(NeptuneHandler(run=self._writer))
 
   def _write_config(self):
     self._writer['config'] = dict(self._config)
