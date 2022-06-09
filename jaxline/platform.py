@@ -65,7 +65,7 @@ def create_checkpointer(
 
 
 
-def create_writer(config: config_dict.ConfigDict, mode: str) -> Any:
+def create_writer(config: config_dict.ConfigDict, mode: str) -> utils.Writer:
   """Creates an object to be used as a writer."""
   if config.logger.type == "neptune_ai":
     return utils.NeptuneAiLogger(config, mode)
