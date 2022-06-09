@@ -123,4 +123,6 @@ def get_base_config():
   config.best_model_eval_metric = ""
   config.best_model_eval_metric_higher_is_better = True
 
+  config.logger = config_dict.ConfigDict(dict(type="tensorboard", kwargs=dict()))
+
   return config

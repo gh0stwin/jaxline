@@ -647,14 +647,14 @@ class NeptuneAiLogger(Writer):
 
   def __init__(self, config, mode):
     super().__init__(config, mode)
-    tags = self._config.get("logger.tags", [])
-    source_files = self._config.get("logger.source_files", None)
-    capture_stdout = self._config.get("logger.capture_stdout", False)
-    capture_stderr = self._config.get("logger.capture_stderr", False)
-    hardware_metrics = self._config.get("logger.capture_hardware_mertics", False)
-    self._writer = neptune.init(project=self._config.logger.project,
-                                name=self._config.logger.name,
-                                api_token=self._config.logger.api_token,
+    tags = self._config.get("logger.kwargs.tags", [])
+    source_files = self._config.get("logger.kwargs.source_files", None)
+    capture_stdout = self._config.get("logger.kwargs.capture_stdout", False)
+    capture_stderr = self._config.get("logger.kwargs.capture_stderr", False)
+    hardware_metrics = self._config.get("logger.kwargs.capture_hardware_mertics", False)
+    self._writer = neptune.init(project=self._config.logger.kwargs.project,
+                                name=self._config.logger.kwargs.name,
+                                api_token=self._config.logger.kwargs.api_token,
                                 tags=tags, source_files=source_files,
                                 capture_hardware_metrics=hardware_metrics,
                                 capture_stdout=capture_stdout,
@@ -666,7 +666,7 @@ class NeptuneAiLogger(Writer):
     global_step = int(global_step)
     self._writer[self._artifact_tag("global_step")].log(global_step)
     for k, v in scalars.items():
-      self._writer[self._artifact_tag(k)].log(v, step=global_step)
+      self._writer[self._artifact_tag(k)].log(float(v), step=global_step)
 
   def write_images(self, global_step: int, images: Mapping[str, Any]):
     global_step = int(global_step)
@@ -682,7 +682,7 @@ class NeptuneAiLogger(Writer):
   def _artifact_tag(self, scalar_key):
     return "{}/{}".format(self._mode, scalar_key)
 
-  def _write_config():
+  def _write_config(self):
     self._writer['config'] = dict(self._config)
 
 class TensorBoardLogger(Writer):
