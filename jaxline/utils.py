@@ -89,7 +89,7 @@ class Writer(abc.ABC):
     """Log initial items after logger initialization."""
     self._write_config()
 
-  def _write_config():
+  def _write_config(self):
     """Write config to logger. By default ignore it."""
     return
 
