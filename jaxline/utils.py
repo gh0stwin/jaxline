@@ -648,6 +648,7 @@ class NeptuneAiLogger(Writer):
 
   def __init__(self, config, mode):
     super().__init__(config, mode)
+    run = self._config.get("logger.kwargs.run", None)
     tags = self._config.get("logger.kwargs.tags", [])
     source_files = self._config.get("logger.kwargs.source_files", None)
     capture_stdout = self._config.get("logger.kwargs.capture_stdout", False)
@@ -656,7 +657,7 @@ class NeptuneAiLogger(Writer):
     self._writer = neptune.init(project=self._config.logger.kwargs.project,
                                 name=self._config.logger.kwargs.name,
                                 api_token=self._config.logger.kwargs.api_token,
-                                tags=tags, source_files=source_files,
+                                run=run, tags=tags, source_files=source_files,
                                 capture_hardware_metrics=hardware_metrics,
                                 capture_stdout=capture_stdout,
                                 capture_stderr=capture_stderr)
