@@ -27,7 +27,7 @@ import queue
 import sys
 import threading
 
-from typing import Any, Callable, Dict, Generator, Iterable, Mapping, Optional, TypeVar
+from typing import Any, Callable, Dict, Generator, Iterable, Iterator, Mapping, Optional, TypeVar
 
 from absl import flags
 from absl import logging
@@ -114,6 +114,67 @@ class Checkpointer(Protocol):
 
   def wait_for_checkpointing_to_finish(self) -> None:
     """Waits for any async checkpointing to complete."""
+
+
+class DataPrefetcher:
+  """Performs prefetching of elements from an iterable in a separate thread through
+  __iter__ and __next__ protocol.
+
+  Args:
+    iterable_function: A python function that when called with no arguments
+      returns an iterable. This is used to build a fresh iterable for each
+      thread (crucial if working with tensorflow datasets because tf.graph
+      objects are thread local).
+    buffer_size (int): Number of elements to keep in the prefetch buffer.
+
+  Raises:
+    ValueError if the buffer_size <= 1.
+    Any error thrown by the iterable_function. Note this is not raised inside
+      the producer, but after it finishes executing.
+  """
+
+  def __init__(self, iterable_func: Callable, buffer_size: int = 5):
+    if buffer_size <= 1:
+      raise ValueError("the buffer_size should be > 1")
+
+    self._iterable_func = iterable_func
+    self._buffer = queue.Queue(maxsize=(buffer_size - 1))
+    self._producer_error = []
+    self._end = object()
+    self._stop_event = threading.Event()
+    self._producer = threading.Thread(target=self._producer, args=(self,), daemon=True)
+    self._producer.start()
+  
+  def _producer(self):
+    """Enques items from iterable on a given thread."""
+    try:
+      # Build a new iterable for each thread. This is crucial if working with
+      # tensorflow datasets because tf.graph objects are thread local.
+      for item in self._iterable_func():
+        if self._stop_event.is_set():
+          break
+
+        self._buffer.put(item)
+    except Exception as e:  # pylint: disable=broad-except
+      logging.exception("Error in producer thread for %s", 
+                        _get_function_name(self._iterable_func))
+      self._producer_error.append(e)
+    finally:
+      self._buffer.put(self._end)
+
+  def __iter__(self):
+    return self
+
+  def __next__(self):
+    value = self._buffer.get()
+
+    if value is self._end:
+      if self._producer_error:
+        raise self._producer_error[0]
+
+      raise StopIteration()
+
+    return value
 
 
 def py_prefetch(
