@@ -755,7 +755,7 @@ class NeptuneAiLogger(Writer):
     if self._config.logger.kwargs.get('log_config', True) is False:
       return
 
-    self._writer['config'] = dict(self._config)
+    self._writer['config'] = self._config.to_dict()
 
 class TensorBoardLogger(Writer):
   """Writer to write experiment data to stdout."""
