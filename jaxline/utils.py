@@ -180,6 +180,7 @@ class DataPrefetcher:
 def py_prefetch(
     iterable_function: Callable[[], Iterable[T]],
     buffer_size: int = 5,
+    stop_event:threading.Event = threading.Event(),
 ) -> Generator[T, None, None]:
   """Performs prefetching of elements from an iterable in a separate thread.
 
@@ -205,13 +206,15 @@ def py_prefetch(
   producer_error = []
   end = object()
 
-  def producer():
+  def producer(stop_event):
     """Enques items from iterable on a given thread."""
     try:
       # Build a new iterable for each thread. This is crucial if working with
       # tensorflow datasets because tf.graph objects are thread local.
       iterable = iterable_function()
       for item in iterable:
+        if stop_event.is_set():
+          break
         buffer.put(item)
     except Exception as e:  # pylint: disable=broad-except
       logging.exception("Error in producer thread for %s",
@@ -220,7 +223,7 @@ def py_prefetch(
     finally:
       buffer.put(end)
 
-  threading.Thread(target=producer, daemon=True).start()
+  threading.Thread(target=producer, args=(stop_event,), daemon=True).start()
 
   # Consumer.
   while True:
