@@ -28,7 +28,8 @@ import queue
 import sys
 import threading
 
-from typing import Any, Callable, Dict, Generator, Iterable, Iterator, Mapping, Optional, TypeVar, Union
+from typing import (Any, Callable, Dict, Generator, Iterable, Mapping, Optional,
+                   TypeVar, Union)
 
 from absl import flags
 from absl import logging
@@ -42,7 +43,6 @@ from neptune.new.integrations.python_logger import NeptuneHandler
 from neptune.new.types import File
 import numpy as np
 import tensorflow as tf
-from typing_extensions import Protocol
 import wrapt
 
 _JAXLINE_POST_MORTEM = flags.DEFINE_bool(

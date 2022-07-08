@@ -15,7 +15,6 @@
 """A Deepmind-specific platform for running Experiments with Jaxline."""
 
 from concurrent import futures
-from typing import Any
 
 from absl import flags
 from absl import logging
@@ -26,8 +25,7 @@ import jax
 from jaxline import base_config
 from jaxline import train
 from jaxline import utils
-from ml_collections import config_dict
-from ml_collections import config_flags
+from ml_collections import config_dict, config_flags
 
 
 # TODO(tomhennigan) Add support for ipdb and pudb.
