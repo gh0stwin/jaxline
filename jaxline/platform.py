@@ -61,6 +61,9 @@ def create_checkpointer(
     mode: str,
 ) -> utils.Checkpointer:
   """Creates an object to be used as a checkpointer."""
+  if config.checkpointer.type == "neptune_ai":
+    return utils.NeptuneAiCheckpointer(config, mode)
+
   return utils.InMemoryCheckpointer(config, mode)
 
 
