@@ -696,10 +696,7 @@ class NeptuneAiCheckpointer(Checkpointer):
   def __init__(
     self,
     config: Union[Mapping[str, Any], config_dict.ConfigDict],
-    mode: str,
-    project: Optional[str] = None,
-    name: Optional[str] = None,
-    api_token: Optional[str] = None,
+    mode: str
   ) -> None:
     super().__init__(config, mode)
     self._tmp_local_dir = config.checkpoint_dir
@@ -717,9 +714,9 @@ class NeptuneAiCheckpointer(Checkpointer):
       return
 
     self._run = neptune.init(
-      project=project,
-      name=name,
-      api_token=api_token,
+      project=config.project,
+      name=config.name,
+      api_token=config.api_token,
       source_files=[],
       capture_hardware_metrics=False,
       capture_stdout=False,

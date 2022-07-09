@@ -59,7 +59,7 @@ def create_checkpointer(
     mode: str,
 ) -> utils.Checkpointer:
   """Creates an object to be used as a checkpointer."""
-  if config.checkpointer.type == "neptune_ai":
+  if config.type == "neptune_ai":
     return utils.NeptuneAiCheckpointer(config, mode)
 
   return utils.InMemoryCheckpointer(config, mode)
@@ -100,27 +100,29 @@ def main(experiment_class, argv, checkpointer_factory=create_checkpointer):
   jaxline_mode = _JAXLINE_MODE.value
   if jaxline_mode == "train":
     # Run training.
-    checkpointer = checkpointer_factory(config, jaxline_mode)
     writer = create_writer(config, jaxline_mode)
+    checkpointer = checkpointer_factory(config.checkpointer, jaxline_mode)
     train.train(experiment_class, config, checkpointer, writer)
   elif jaxline_mode.startswith("eval"):
     # Run evaluation.
-    checkpointer = checkpointer_factory(config, jaxline_mode)
     writer = create_writer(config, jaxline_mode)
+    checkpointer = checkpointer_factory(config.checkpointer, jaxline_mode)
     train.evaluate(experiment_class, config, checkpointer, writer,
                    jaxline_mode)
   elif jaxline_mode == "train_eval_multithreaded":
     pool = futures.ThreadPoolExecutor(1)
+    writer_train = create_writer(config, "train")
+    writer_eval = create_writer(config, "eval")
 
     # Run training in a background thread!
     pool.submit(train.train, experiment_class, config,
-                checkpointer_factory(config, "train"),
-                create_writer(config, "train"))
+                checkpointer_factory(config.checkpointer, "train"),
+                writer_train)
 
     # Run eval!
     train.evaluate(experiment_class, config,
-                   checkpointer_factory(config, "eval"),
-                   create_writer(config, "eval"))
+                   checkpointer_factory(config.checkpointer, "eval"),
+                   writer_eval)
 
     # If we're here, eval has finished. Wait for train to finish!
     pool.shutdown()
