@@ -155,7 +155,12 @@ class DataPrefetcher:
       the producer, but after it finishes executing.
   """
 
-  def __init__(self, iterable_func: Callable, buffer_size: int = 5):
+  def __init__(
+    self,
+    iterable_func: Callable,
+    buffer_size: int = 5,
+    stop_event: Optional[threading.Event] = None
+  ) -> None:
     if buffer_size <= 1:
       raise ValueError("the buffer_size should be > 1")
 
@@ -163,11 +168,11 @@ class DataPrefetcher:
     self._buffer = queue.Queue(maxsize=(buffer_size - 1))
     self._producer_error = []
     self._end = object()
-    self._stop_event = threading.Event()
-    self._producer = threading.Thread(target=self._producer, args=(self,), daemon=True)
+    self._stop_event = stop_event if stop_event else threading.Event()
+    self._producer = threading.Thread(target=self._producer_cycle, daemon=True)
     self._producer.start()
   
-  def _producer(self):
+  def _producer_cycle(self):
     """Enques items from iterable on a given thread."""
     try:
       # Build a new iterable for each thread. This is crucial if working with
@@ -202,7 +207,7 @@ class DataPrefetcher:
 def py_prefetch(
     iterable_function: Callable[[], Iterable[T]],
     buffer_size: int = 5,
-    stop_event:threading.Event = threading.Event(),
+    stop_event: threading.Event = threading.Event(),
 ) -> Generator[T, None, None]:
   """Performs prefetching of elements from an iterable in a separate thread.
 
