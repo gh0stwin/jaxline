@@ -695,12 +695,15 @@ ACTIVE_CHECKPOINT = {}
 class NeptuneAiCheckpointer(Checkpointer):
   def __init__(
     self,
-    config: Union[Mapping[str, Any], config_dict.ConfigDict],
-    mode: str
+    checkpoint_dir: str,
+    base_dir: str,
+    project: Optional[str] = None,
+    name: Optional[str] = None,
+    api_token: Optional[str] = None,
   ) -> None:
-    super().__init__(config, mode)
-    self._tmp_local_dir = config.checkpoint_dir
-    self._base_dir = config.base_dir
+    super().__init__()
+    self._tmp_local_dir = checkpoint_dir
+    self._base_dir = base_dir
     self._last_model_path = f"{self._base_dir}/last_model_path"
     self._suffix = ".pkl"
     self._i = 0
@@ -714,9 +717,9 @@ class NeptuneAiCheckpointer(Checkpointer):
       return
 
     self._run = neptune.init(
-      project=config.project,
-      name=config.name,
-      api_token=config.api_token,
+      project=project,
+      name=name,
+      api_token=api_token,
       source_files=[],
       capture_hardware_metrics=False,
       capture_stdout=False,
@@ -724,14 +727,13 @@ class NeptuneAiCheckpointer(Checkpointer):
     )
 
   def can_be_restored(self, ckpt_series: str) -> bool:
-    return (ckpt_series in ACTIVE_CHECKPOINT or
-           self._run[f"{self._base_dir}/{ckpt_series}__last_path"].exists())
+    return self._run.exists(f"{self._base_dir}/{ckpt_series}__last_path")
 
   def get_experiment_state(self, ckpt_series: str):
     if ckpt_series not in ACTIVE_CHECKPOINT:
       ACTIVE_CHECKPOINT[ckpt_series] = threading.local()
 
-    if not hasattr(self._active_checkpoint, "state"):
+    if not hasattr(ACTIVE_CHECKPOINT, "state"):
       ACTIVE_CHECKPOINT[ckpt_series].state = config_dict.ConfigDict()
     
     return ACTIVE_CHECKPOINT[ckpt_series]
