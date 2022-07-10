@@ -647,9 +647,8 @@ GLOBAL_CHECKPOINT_DICT = {}
 class InMemoryCheckpointer(Checkpointer):
   """A Checkpointer reliant on an in-memory global dictionary."""
 
-  def __init__(self, config, mode: str):
-    self._max_checkpoints_to_keep = config.max_checkpoints_to_keep
-    del mode
+  def __init__(self, max_checkpoints_to_keep: int):
+    self._max_checkpoints_to_keep = max_checkpoints_to_keep
 
   def get_experiment_state(self, ckpt_series: str):
     """Returns the experiment state for a given checkpoint series."""
@@ -744,7 +743,7 @@ class NeptuneAiCheckpointer(Checkpointer):
     return ACTIVE_CHECKPOINT[ckpt_series]
 
   def save(self, ckpt_series: str) -> None:
-    ckpt_file = os.path.join(self._base_dir, f"checkpoint{self._suffix}")
+    ckpt_file = os.path.join(self._tmp_local_dir, f"checkpoint{self._suffix}")
 
     with open(ckpt_file, "wb") as checkpoint_file:
       pickle.dump(ACTIVE_CHECKPOINT[ckpt_series].__dict__, checkpoint_file, protocol=2)
