@@ -107,10 +107,6 @@ class Checkpointer(abc.ABC):
     """Restores the checkpoint."""
 
   @abc.abstractmethod
-  def get_experiment_state(self, ckpt_series: str):
-    """Returns the experiment state for a given checkpoint series."""
-
-  @abc.abstractmethod
   def restore_path(self, ckpt_series: str) -> Optional[str]:
     """Returns the restore path for the checkpoint, or None."""
 
@@ -639,58 +635,62 @@ def evaluate_should_return_dict(f: F) -> F:
   return evaluate_with_warning
 
 
-# We use a global dictionary so that multiple different checkpoints can share
-# underlying data.
-GLOBAL_CHECKPOINT_DICT = {}
-
-
-class InMemoryCheckpointer(Checkpointer):
+class LocalCheckpointer(Checkpointer):
   """A Checkpointer reliant on an in-memory global dictionary."""
 
-  def __init__(self, max_checkpoints_to_keep: int):
-    self._max_checkpoints_to_keep = max_checkpoints_to_keep
+  def __init__(self, checkpoint_dir: str):
+    self._ckpt_dir = checkpoint_dir
+    self._suffix = ".pkl"
 
-  def get_experiment_state(self, ckpt_series: str):
-    """Returns the experiment state for a given checkpoint series."""
-    if ckpt_series not in GLOBAL_CHECKPOINT_DICT:
-      active = threading.local()
-      new_series = CheckpointNT(active, [])
-      GLOBAL_CHECKPOINT_DICT[ckpt_series] = new_series
-    if not hasattr(GLOBAL_CHECKPOINT_DICT[ckpt_series].active, "state"):
-      GLOBAL_CHECKPOINT_DICT[ckpt_series].active.state = (
-          config_dict.ConfigDict())
-    return GLOBAL_CHECKPOINT_DICT[ckpt_series].active.state
-
-  def save(self, ckpt_series: str) -> None:
+  def save(self, ckpt_series: str, state: config_dict.ConfigDict) -> None:
     """Saves the checkpoint."""
-    series = GLOBAL_CHECKPOINT_DICT[ckpt_series]
-    active_state = self.get_experiment_state(ckpt_series)
-    id_ = 0 if not series.history else series.history[-1].id + 1
-    snapshot = copy.copy(active_state)
-    series.history.append(SnapshotNT(id_, snapshot))
-    if len(series.history) > self._max_checkpoints_to_keep:
-      GLOBAL_CHECKPOINT_DICT[ckpt_series] = series._replace(
-          history=series.history[-self._max_checkpoints_to_keep:])
-    logging.info("Saved checkpoint %s with id %s.", ckpt_series, id_)
+    file_path = self._ckpt_series_file(ckpt_series)
+    tmp_path = self._ckpt_series_file(ckpt_series + "_tmp")
+    old_path = self._ckpt_series_file(ckpt_series + "_old")
+
+    # Creates a rolling ckpt.
+    with open(tmp_path, "wb") as checkpoint_file:
+      pickle.dump(state, checkpoint_file, protocol=2)
+
+    try:
+      os.rename(file_path, old_path)
+      remove_old = True
+    except FileNotFoundError:
+      remove_old = False  # No previous checkpoint to remove
+
+    if remove_old:
+      os.remove(old_path)
+
+    os.rename(tmp_path, file_path)
+    logging.info("Saved new checkpoint for '%s' series.", ckpt_series)
 
   def can_be_restored(self, ckpt_series: str) -> bool:
     """Returns whether or not a given checkpoint series can be restored."""
-    return ((ckpt_series in GLOBAL_CHECKPOINT_DICT) and
-            GLOBAL_CHECKPOINT_DICT[ckpt_series].history)
+    return os.path.exists(self._ckpt_series_file(ckpt_series))
 
   def restore(self, ckpt_series: str) -> None:
     """Restores the checkpoint."""
-    snapshot = GLOBAL_CHECKPOINT_DICT[ckpt_series].history[-1].pickle_nest
-    current_state = self.get_experiment_state(ckpt_series)
-    self._override_or_insert(current_state, snapshot)
-    logging.info("Returned checkpoint %s with id %s.", ckpt_series,
-                 GLOBAL_CHECKPOINT_DICT[ckpt_series].history[-1].id)
+    ckpt_path = self._ckpt_series_file(ckpt_series)
+    ckpt_data = None
+
+    try:
+      with open(ckpt_path, "rb") as checkpoint_file:
+        ckpt_data = pickle.load(checkpoint_file)
+        logging.info("Returned checkpoint for '%s' series.", ckpt_series)
+    except FileNotFoundError:
+      logging.info("No existing checkpoint found at %s", ckpt_path)
+
+    return ckpt_data
 
   def restore_path(self, ckpt_series: str) -> Optional[str]:
     """Returns the restore path for the checkpoint, or None."""
     if not self.can_be_restored(ckpt_series):
       return None
-    return GLOBAL_CHECKPOINT_DICT[ckpt_series].history[-1].id
+
+    return self._ckpt_series_file(ckpt_series)
+
+  def _ckpt_series_file(self, ckpt_series: str) -> str:
+    return os.path.join(self._ckpt_dir, ckpt_series + self._suffix)
 
 
 ACTIVE_CHECKPOINT = {}
@@ -733,27 +733,18 @@ class NeptuneAiCheckpointer(Checkpointer):
   def can_be_restored(self, ckpt_series: str) -> bool:
     return self._run.exists(f"{self._base_dir}/{ckpt_series}__last_path")
 
-  def get_experiment_state(self, ckpt_series: str):
-    if ckpt_series not in ACTIVE_CHECKPOINT:
-      ACTIVE_CHECKPOINT[ckpt_series] = threading.local()
-
-    if not hasattr(ACTIVE_CHECKPOINT, "state"):
-      ACTIVE_CHECKPOINT[ckpt_series].state = config_dict.ConfigDict()
-    
-    return ACTIVE_CHECKPOINT[ckpt_series]
-
-  def save(self, ckpt_series: str) -> None:
+  def save(self, ckpt_series: str, state: config_dict.ConfigDict) -> None:
     ckpt_file = os.path.join(self._tmp_local_dir, f"checkpoint{self._suffix}")
 
     with open(ckpt_file, "wb") as checkpoint_file:
-      pickle.dump(ACTIVE_CHECKPOINT[ckpt_series].__dict__, checkpoint_file, protocol=2)
+      pickle.dump(state, checkpoint_file, protocol=2)
 
     path = f"{self._base_dir}/{ckpt_series}__{self._i}"
     self._run[path].upload(ckpt_file)
     self._run[f"{self._base_dir}/{ckpt_series}__last_path"] = path
     self._i += 1
 
-  def restore(self, ckpt_series: str) -> None:
+  def restore(self, ckpt_series: str) -> config_dict.ConfigDict:
     checkpoint_path = self.restore_path(ckpt_series)
     self._run[checkpoint_path].download(self._tmp_local_dir)
     checkpoint_path = os.path.join(
@@ -762,8 +753,8 @@ class NeptuneAiCheckpointer(Checkpointer):
 
     with open(checkpoint_path, "rb") as checkpoint_file:
       checkpoint = pickle.load(checkpoint_file)
-    
-    self._override_or_insert(self.get_experiment_state(ckpt_series), checkpoint)
+
+    return checkpoint
 
   def restore_path(self, ckpt_series: str) -> Optional[str]:
     return self._run[f"{self._base_dir}/{ckpt_series}__last_path"].fetch()

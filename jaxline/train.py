@@ -79,14 +79,14 @@ def train(
     experiment = _initialize_experiment(
         experiment_class, "train", rng, config.experiment_kwargs)
 
-  state = checkpointer.get_experiment_state("latest")
-  state.global_step = 0
-  state.experiment_module = experiment.snapshot_state()
-  state.train_step_rng = utils.bcast_local_devices(rng)
-
   if checkpointer.can_be_restored("latest"):
     with utils.log_activity("checkpoint restore"):
-      checkpointer.restore("latest")
+      state = _restore_checkpoint("latest", experiment)
+  else:
+    state = config_dict.ConfigDict
+    state.global_step = 0
+    state.experiment = experiment.snapshot_state()
+    state.train_step_rng = utils.bcast_local_devices(rng)
 
   periodic_actions += (
       utils.PeriodicAction(
@@ -97,17 +97,13 @@ def train(
 
   if config.train_checkpoint_all_hosts or is_chief:
     if config.save_checkpoint_interval > 0:
-      def save_checkpoint(*args):
-        state.experiment_module = experiment.snapshot_state()
-        checkpointer.save("latest")
-
       periodic_actions += (
           utils.PeriodicAction(
-              save_checkpoint,
-              interval_type=(config.checkpoint_interval_type
-                             or config.interval_type),
-              interval=config.save_checkpoint_interval,
-              run_async=False),)  # run_async True would not be thread-safe.
+            lambda *_: _save_checkpoint(checkpointer, "latest", state, experiment),
+            interval_type=(config.checkpoint_interval_type
+                            or config.interval_type),
+            interval=config.save_checkpoint_interval,
+            run_async=False),)  # run_async True would not be thread-safe.
 
   if is_chief:
     if writer is not None:
@@ -129,7 +125,7 @@ def train(
 
   if is_chief:
     with utils.log_activity("final checkpoint"):
-      checkpointer.save("latest")
+      _save_checkpoint(checkpointer, "latest", state, experiment)
 
   # Join all async periodic actions that are unfinished.
   for pa in periodic_actions:
@@ -163,7 +159,7 @@ def evaluate(
 
   if config.best_model_eval_metric and jax.host_id() == 0:
     # Initialize best state.
-    best_state = config_dict.ConfigDict
+    best_state = config_dict.ConfigDict()
     if config.best_model_eval_metric_higher_is_better:
       best_state.best_eval_metric_value = float("-inf")
       eval_metric_is_better_op = jnp.greater
@@ -174,18 +170,17 @@ def evaluate(
       eval_metric_comparison_str = "<"
     best_state.best_model_eval_metric = config.best_model_eval_metric
 
-    best_state.experiment_module = experiment.snapshot_state()
+    best_state.experiment = experiment.snapshot_state()
 
     # Restore to preserve 'best_eval_metric_value' if evaluator was preempted.
     if checkpointer.can_be_restored("best"):
       with utils.log_activity("best checkpoint restore"):
-        snapshot = checkpointer.restore("best")
-        experiment.restore_from_snapshot(snapshot)
+        best_state = _restore_checkpoint(checkpointer, "best", experiment)
 
   # Will evaluate the latest checkpoint in the directory.
-  state = checkpointer.get_experiment_state("latest")
+  state = config_dict.ConfigDict()
   state.global_step = global_step
-  state.experiment_module = experiment.snapshot_state()
+  state.experiment = experiment.snapshot_state()
   state.train_step_rng = None
 
   eval_rng = jnp.broadcast_to(
@@ -196,8 +191,7 @@ def evaluate(
       mode=config.random_mode_eval), axis_name="i")(eval_rng, host_id_devices)
 
   if config.one_off_evaluate:
-    snapshot = checkpointer.restore("latest")
-    experiment.restore_from_snapshot(snapshot)
+    state = _restore_checkpoint(checkpointer, "latest", experiment)
     global_step_devices = utils.bcast_local_devices(
         jnp.asarray(state.global_step))
     scalar_values = utils.evaluate_should_return_dict(experiment.evaluate)(
@@ -225,9 +219,7 @@ def evaluate(
         time.sleep(10)
         continue
 
-      snapshot = checkpointer.restore("latest")
-      experiment.restore_from_snapshot(snapshot)
-
+      state = _restore_checkpoint(checkpointer, "latest", experiment)
 
     global_step_devices = utils.bcast_local_devices(
         jnp.asarray(state.global_step))
@@ -251,12 +243,21 @@ def evaluate(
                      config.best_model_eval_metric, current_eval_metric_value,
                      eval_metric_comparison_str, old_eval_metric_value)
         best_state.global_step = state.global_step
-        best_state.experiment_module = experiment.snapshot_state()
+        best_state.experiment = experiment.snapshot_state()
         best_state.best_eval_metric_value = current_eval_metric_value
         best_state.train_step_rng = state.train_step_rng
-        checkpointer.save("best")
+        _save_checkpoint(checkpointer, "best", state, experiment)
 
     if not experiment.should_run_step(state.global_step, config):
       logging.info("Last checkpoint (iteration %d) evaluated, exiting.",
                    state.global_step)
       break
+
+def _restore_checkpoint(checkpointer, ckpt_series, experiment):
+  state = checkpointer.restore(ckpt_series)
+  experiment.restore_from_snapshot(state.experiment)
+  return state
+
+def _save_checkpoint(checkpointer, ckpt_series, state, experiment):
+  state.experiment = experiment.snapshot_state()
+  checkpointer.save(ckpt_series, state)
