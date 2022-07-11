@@ -748,7 +748,7 @@ class NeptuneAiCheckpointer(Checkpointer):
     checkpoint_path = self.restore_path(ckpt_series)
     self._run[checkpoint_path].download(self._tmp_local_dir)
     checkpoint_path = os.path.join(
-      self._checkpoint_dir, checkpoint_path.rsplit("/", 1)[-1] + self._suffix
+      self._tmp_local_dir, checkpoint_path.rsplit("/", 1)[-1] + self._suffix
     )
 
     with open(checkpoint_path, "rb") as checkpoint_file:

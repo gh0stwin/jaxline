@@ -83,7 +83,7 @@ def train(
     with utils.log_activity("checkpoint restore"):
       state = _restore_checkpoint("latest", experiment)
   else:
-    state = config_dict.ConfigDict
+    state = config_dict.ConfigDict()
     state.global_step = 0
     state.experiment = experiment.snapshot_state()
     state.train_step_rng = utils.bcast_local_devices(rng)
