@@ -99,11 +99,11 @@ class Checkpointer(abc.ABC):
   """An interface for checkpointer objects."""
 
   @abc.abstractmethod
-  def save(self, ckpt_series: str) -> None:
+  def save(self, ckpt_series: str, state: Any) -> None:
     """Saves the checkpoint."""
 
   @abc.abstractmethod
-  def restore(self, ckpt_series: str) -> None:
+  def restore(self, ckpt_series: str ) -> Any:
     """Restores the checkpoint."""
 
   @abc.abstractmethod
@@ -635,6 +635,23 @@ def evaluate_should_return_dict(f: F) -> F:
   return evaluate_with_warning
 
 
+class NoneCheckpointer(Checkpointer):
+  def __init__(self, *args, **kwargs) -> None:
+    super().__init__()
+
+  def save(self, ckpt_series: str, state:Any) -> None:
+    return
+
+  def can_be_restored(self, ckpt_series: str) -> bool:
+    return False
+
+  def restore(self, ckpt_series: str) -> Any:
+    raise FileNotFoundError(f"Cannot restore checkpoint for '{ckpt_series}' series")
+    
+  def restore_path(self, ckpt_series: str) -> Optional[str]:
+    return ""
+
+
 class LocalCheckpointer(Checkpointer):
   """A Checkpointer reliant on an in-memory global dictionary."""
 
@@ -691,9 +708,6 @@ class LocalCheckpointer(Checkpointer):
 
   def _ckpt_series_file(self, ckpt_series: str) -> str:
     return os.path.join(self._ckpt_dir, ckpt_series + self._suffix)
-
-
-ACTIVE_CHECKPOINT = {}
 
 
 class NeptuneAiCheckpointer(Checkpointer):
