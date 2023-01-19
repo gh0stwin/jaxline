@@ -82,6 +82,7 @@ def get_base_config():
   config.save_checkpoint_interval = 300
   config.log_tensors_interval = 60
   config.log_train_data_interval = 120.0  # None to turn off
+  config.log_final_step = True
 
   # Overrides of `interval_type` for specific periodic operations. If `None`,
   # we use the value of `interval_type`.

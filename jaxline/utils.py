@@ -519,6 +519,7 @@ class PeriodicAction:
     self._interval_type = interval_type
     self._interval = interval
     self._prev_time = start_time
+    self._start_step = start_step
     self._prev_step = start_step
     self._apply_fn_future = None
     if run_async:
@@ -548,7 +549,7 @@ class PeriodicAction:
       return t - self._prev_time >= self._interval
     else:
       assert self._interval_type == "steps"  # error should've be caught in init
-      return step % self._interval == 0
+      return step >= self._start_step and step % self._interval == 0
 
   def update_time(self, t: float, step: int):
     """Updates the internal time measurements."""

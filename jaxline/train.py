@@ -118,6 +118,11 @@ def train(
               interval=config.log_train_data_interval,
               log_all_data=config.log_all_train_data),)
 
+      final_log_action = _log_final_step_action(config, write_scalars)
+
+      if final_log_action:
+        periodic_actions += (final_log_action,)
+
   for pa in periodic_actions:
     pa.update_time(time.time(), state.global_step)
 
@@ -252,6 +257,24 @@ def evaluate(
       logging.info("Last checkpoint (iteration %d) evaluated, exiting.",
                    state.global_step)
       break
+
+def _log_final_step_action(config, write_scalars_def):
+  if config.log_final_step is False:
+    return None
+
+  log_type = config.logging_interval_type
+  log_type = config.interval_type if log_type is None else log_type
+
+  if log_type != "steps" or config.training_steps % config.save_checkpoint_interval != 0:
+    return utils.PeriodicAction(
+      write_scalars_def,
+      interval_type="steps",
+      interval=config.training_steps - 1,
+      start_step=1,
+      log_all_data=config.log_all_train_data
+    )
+
+  return None
 
 def _restore_checkpoint(checkpointer, ckpt_series, experiment):
   state = checkpointer.restore(ckpt_series)
