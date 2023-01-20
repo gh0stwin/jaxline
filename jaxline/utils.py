@@ -806,7 +806,7 @@ class NeptuneAiLogger(Writer):
     capture_stdout = self._config.get("logger.kwargs.capture_stdout", False)
     capture_stderr = self._config.get("logger.kwargs.capture_stderr", False)
     hardware_metrics = self._config.get("logger.kwargs.capture_hardware_mertics", False)
-    self._writer = neptune.init(project=self._config.logger.kwargs.project,
+    self._writer = neptune.init_run(project=self._config.logger.kwargs.project,
                                 name=self._config.logger.kwargs.name,
                                 api_token=self._config.logger.kwargs.api_token,
                                 run=run, tags=tags, source_files=source_files,
@@ -827,11 +827,10 @@ class NeptuneAiLogger(Writer):
     for k, v in images.items():
       if v.ndim == 2:
         v = v[None, ..., None]
-        self._writer[self._artifact_tag(k)].log(File.as_image(v), step=global_step)
+        self._writer[self._artifact_tag(k)].log(File.as_image(v))
       elif v.ndim == 4:
         for i in range(v.shape[0]):
-          self._writer[self._artifact_tag("{}_{}".format(k, i))].log(v[i],
-                                                                     step=global_step)
+          self._writer[self._artifact_tag(k)].log(File.as_image(v[i]))
 
   def _artifact_tag(self, scalar_key):
     return "{}/{}".format(self._mode, scalar_key)
