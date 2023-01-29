@@ -839,6 +839,9 @@ class NeptuneAiLogger(Writer):
 
   def _post_init(self):
     super()._post_init()
+    self._config = self._config.unlock()
+    self._config.log_id = self._writer["sys/id"].fetch()
+    self._config = self._config.lock()
 
     if self._config.get("logger.kwargs.capture_stdout", False) is True:
       logging.get_absl_logger().addHandler(NeptuneHandler(run=self._writer))
