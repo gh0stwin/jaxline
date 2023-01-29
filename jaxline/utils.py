@@ -810,7 +810,7 @@ class NeptuneAiLogger(Writer):
     self._writer = neptune.init_run(project=self._config.logger.kwargs.project,
                                 name=self._config.logger.kwargs.name,
                                 api_token=self._config.logger.kwargs.api_token,
-                                run=run, tags=tags, source_files=source_files,
+                                with_id=run, tags=tags, source_files=source_files,
                                 capture_hardware_metrics=hardware_metrics,
                                 capture_stdout=capture_stdout,
                                 capture_stderr=capture_stderr,
