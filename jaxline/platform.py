@@ -23,8 +23,10 @@ import chex
 import jax
 
 from jaxline import base_config
+from jaxline import checkpointers
 from jaxline import train
 from jaxline import utils
+from jaxline import writers
 from ml_collections import config_dict, config_flags
 
 
@@ -60,20 +62,22 @@ def create_checkpointer(
 ) -> utils.Checkpointer:
   """Creates an object to be used as a checkpointer."""
   if config.type == "neptune_ai":
-    return utils.NeptuneAiCheckpointer(**config.kwargs)
+    return checkpointers.NeptuneAiCheckpointer(**config.kwargs)
   if config.type == "local":
-    return utils.LocalCheckpointer(**config.kwargs)
+    return checkpointers.LocalCheckpointer(**config.kwargs)
 
-  return utils.NoneCheckpointer(**config.kwargs)
+  return checkpointers.NoneCheckpointer(**config.kwargs)
 
 
 
 def create_writer(config: config_dict.ConfigDict, mode: str) -> utils.Writer:
   """Creates an object to be used as a writer."""
-  if config.logger.type == "neptune_ai":
-    return utils.NeptuneAiLogger(config, mode)
+  if config.logger.type == "clear_ml":
+    return writers.ClearMlLogger(config, mode)
+  elif config.logger.type == "neptune_ai":
+    return writers.NeptuneAiLogger(config, mode)
 
-  return utils.TensorBoardLogger(config, mode)
+  return writers.TensorBoardLogger(config, mode)
 
 
 @utils.debugger_fallback
