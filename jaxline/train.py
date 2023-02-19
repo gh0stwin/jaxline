@@ -27,7 +27,9 @@ from absl import flags
 from absl import logging
 import jax
 import jax.numpy as jnp
+from jaxline import checkpointers
 from jaxline import utils
+from jaxline import writers
 from ml_collections import config_dict
 
 FLAGS = flags.FLAGS
@@ -66,7 +68,7 @@ def _initialize_experiment(experiment_class, mode, rng, experiment_kwargs):
 def train(
     experiment_class,
     config,
-    checkpointer: utils.Checkpointer,
+    checkpointer: checkpointers.Checpointer,
     writer: Optional[writers.Writer],
     periodic_actions=(),
 ):
@@ -147,7 +149,7 @@ def train(
 def evaluate(
     experiment_class,
     config,
-    checkpointer: utils.Checkpointer,
+    checkpointer: checkpointers.Checpointer,
     writer: Optional[writers.Writer],
     jaxline_mode: Optional[str] = None,
 ):
