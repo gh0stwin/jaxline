@@ -68,7 +68,7 @@ def _initialize_experiment(experiment_class, mode, rng, experiment_kwargs):
 def train(
     experiment_class,
     config,
-    checkpointer: checkpointers.Checpointer,
+    checkpointer: checkpointers.Checkpointer,
     writer: Optional[writers.Writer],
     periodic_actions=(),
 ):
@@ -149,7 +149,7 @@ def train(
 def evaluate(
     experiment_class,
     config,
-    checkpointer: checkpointers.Checpointer,
+    checkpointer: checkpointers.Checkpointer,
     writer: Optional[writers.Writer],
     jaxline_mode: Optional[str] = None,
 ):
