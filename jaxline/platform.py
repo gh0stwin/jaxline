@@ -59,7 +59,7 @@ _JAXLINE_ENSURE_TPU = flags.DEFINE_bool(
 def create_checkpointer(
     config: config_dict.ConfigDict,
     mode: str,
-) -> utils.Checkpointer:
+) -> checkpointers.Checkpointer:
   """Creates an object to be used as a checkpointer."""
   if config.type == "neptune_ai":
     return checkpointers.NeptuneAiCheckpointer(**config.kwargs)
@@ -70,7 +70,7 @@ def create_checkpointer(
 
 
 
-def create_writer(config: config_dict.ConfigDict, mode: str) -> utils.Writer:
+def create_writer(config: config_dict.ConfigDict, mode: str) -> writers.Writer:
   """Creates an object to be used as a writer."""
   if config.logger.type == "clear_ml":
     return writers.ClearMlLogger(config, mode)

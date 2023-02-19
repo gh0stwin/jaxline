@@ -67,7 +67,7 @@ def train(
     experiment_class,
     config,
     checkpointer: utils.Checkpointer,
-    writer: Optional[utils.Writer],
+    writer: Optional[writers.Writer],
     periodic_actions=(),
 ):
   """Main training loop."""
@@ -148,7 +148,7 @@ def evaluate(
     experiment_class,
     config,
     checkpointer: utils.Checkpointer,
-    writer: Optional[utils.Writer],
+    writer: Optional[writers.Writer],
     jaxline_mode: Optional[str] = None,
 ):
   """Main evaluation loop."""

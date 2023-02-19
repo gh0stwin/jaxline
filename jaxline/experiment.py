@@ -28,6 +28,7 @@ from absl import logging
 import jax
 import jax.numpy as jnp
 from jaxline import utils
+from jaxline import writers
 from ml_collections import config_dict
 import numpy as np
 
@@ -63,7 +64,7 @@ class AbstractExperiment(abc.ABC):
       *,
       global_step: jnp.ndarray,
       rng: jnp.ndarray,
-      writer: Optional[utils.Writer],
+      writer: Optional[writers.Writer],
   ) -> Dict[str, np.ndarray]:
     """Performs a step of computation e.g. a training step.
 
@@ -93,7 +94,7 @@ class AbstractExperiment(abc.ABC):
       *,
       global_step: jnp.ndarray,
       rng: jnp.ndarray,
-      writer: Optional[utils.Writer],
+      writer: Optional[writers.Writer],
   ) -> Optional[Dict[str, np.ndarray]]:
 
     """Performs the full evaluation of the model.
@@ -130,7 +131,7 @@ class AbstractExperiment(abc.ABC):
       config: config_dict.ConfigDict,
       state,
       periodic_actions: List[utils.PeriodicAction],
-      writer: Optional[utils.Writer] = None,
+      writer: Optional[writers.Writer] = None,
   ) -> None:
     """Default training loop implementation.
 
