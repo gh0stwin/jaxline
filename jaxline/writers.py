@@ -41,7 +41,7 @@ class ClearMlLogger(Writer):
     super().__init__(config, mode)
     task = clearml.Task.current_task()
     task.set_parameters(config.to_dict())
-    self._writer = clearml.Task(**self._config.logger.kwargs).get_logger()
+    self._writer = task.get_logger()
 
   def write_scalars(self, global_step: int, scalars: Mapping[str, Any]):
     global_step = int(global_step)
