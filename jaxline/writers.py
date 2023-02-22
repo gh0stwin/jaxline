@@ -19,6 +19,14 @@ class Writer(abc.ABC):
     self._config = config
     self._mode = mode
 
+  @property
+  def mode(self) -> str:
+    return self._mode
+
+  @mode.setter
+  def mode(self, mode: str):
+    self._mode = mode
+
   @abc.abstractmethod
   def write_scalars(self, global_step: int, scalars: Mapping[str, Any]):
     """Write scalars to logger."""
