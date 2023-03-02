@@ -71,15 +71,14 @@ class ClearMlLogger(Writer):
 
     for k, v in images.items():
       if v.ndim == 2:
-        v = v[None, ..., None]
-        self._writer.report_image(title=k,
-                                  series=self._mode,
+        self._writer.report_image(title=self.mode,
+                                  series=k,
                                   iteration=global_step,
                                   image=v)
       elif v.ndim == 4:
         for i in range(v.shape[0]):
-          self._writer.report_image(title=k,
-                                    series=self._mode,
+          self._writer.report_image(title=self.mode,
+                                    series=f"{k}_{i}",
                                     iteration=global_step,
                                     image=v[i])
 
