@@ -4,4 +4,3 @@ ml_collections>=0.1
 numpy>=1.18.0
 wrapt>=1.11.2
 typing_extensions>=3.7
-neptune-client~=0.16
