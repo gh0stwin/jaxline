@@ -8,6 +8,7 @@ from typing import Any, Optional
 from absl import logging
 import jax
 from ml_collections import config_dict
+import neptune.new as neptune
 
 
 class Checkpointer(abc.ABC):
@@ -124,9 +125,7 @@ class LocalCheckpointer(Checkpointer):
     return os.path.join(self._ckpt_dir, ckpt_series + self._suffix)
 
 
-class NeptuneAiCheckpointer(Checkpointer):
-  import neptune.new as neptune
-  
+class NeptuneAiCheckpointer(Checkpointer):  
   def __init__(
     self,
     checkpoint_dir: str,
